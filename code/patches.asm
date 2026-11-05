@@ -4188,8 +4188,12 @@ endif
 
 endif 
 
-pad $3E000      
-assert pc() <= $E000 
+if !cv3HorizontalAutoscroll == 1
+  incsrc "code/custom/horizontal_autoscroll.asm"
+endif
+
+assert pc() <= $E000
+pad $3E000
 org LAST_BANK+$1FCA
 base $FFCA
 

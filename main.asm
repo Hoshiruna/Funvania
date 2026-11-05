@@ -23,7 +23,7 @@ check bankcross off
     ; LAST_BANK => label.asm    ; data_screens_compressed.asm has FreeSpace -> newLoad_X_preserveAll, MMC5Init
 
     ; expand PRG 40000-43fff    ; a0 main hijacks (pause, all_bank_free_space "code/patches.asm")
-    ; expand PRG 44000-47fff    ; a2 !unused    
+    ; expand PRG 44000-47fff    ; a2 cv3-asm stair controls
     ; expand PRG 48000-4dfff    ; a4 sram code
     ; expand PRG 4c000-4ffff    ; a6 data screens
     ; expand PRG 50000-53fff    ; a8 data moved
@@ -71,6 +71,10 @@ org ROM_CHRstart+ROM_CHRsize
     !debuggMenu = 0                 ; -- debug ---------------------
     !levelSelect = 1    
     !sprite_viewer = 0   
+
+    !cv3BetterStairs = 1            ; -- cv3-asm --------------------
+    !cv3HorizontalAutoscroll = 1
+    !cv3HorizontalScrollSpeed = $0030 ; $0001-$0100 (8.8 pixels/frame)
 
 }
 
@@ -133,7 +137,11 @@ pushPC
     incsrc "code/data_tables_transit.asm"
     
 pullPC 
-assert pc() <= $4c000 
+if !cv3BetterStairs == 1
+    assert pc() <= $C000            ; bank $A0 limit
+else
+    assert pc() <= $4c000
+endif
 org $50000          ; free space 
 base $8000
         db $A8      ; bankIDX mark 
@@ -149,7 +157,11 @@ pushPC
     
     
 pullPC 
-assert pc() <= $54000   
+assert pc() <= $54000
+
+if !cv3BetterStairs == 1
+    incsrc "code/custom/better_stair.asm"
+endif
 
 
 { ; CHR patching

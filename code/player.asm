@@ -1262,8 +1262,15 @@ endif
 			CODE_0E8740:
 						LDA.B r_bossActiveFlag               ;0E8740|A578    |000078;
 						BNE stopScroll_if_boss_87            ;0E8742|D01E    |0E8762;
+						if !cv3HorizontalAutoscroll == 1
+						JMP.W cv3_horizontal_player_camera   ;0E8744|4C      |      ;
+						NOP                                  ;0E8747|EA      |      ;
+						else
 						LDA.B r_roomOrientation              ;0E8744|A568    |000068;
 						BMI stopScroll_if_boss_87            ;0E8746|301A    |0E8762;
+						endif
+
+			cv3_horizontal_native_player_scroll_check:
 						LDA.W r_entity_Xspd                ;0E8748|ADF204  |0E04F2;
 						BMI CODE_0E8782                      ;0E874B|3035    |0E8782;
 						ORA.W r_entity_XsubSpd             ;0E874D|0D0905  |0E0509;
@@ -1643,7 +1650,11 @@ endif
 		selectCurPlayer:
 						LDA.B #$02                           ;0E8A8D|A902    |      ;
 						STA.B r_scrollDirection              ;0E8A8F|8565    |000065;
+						if !cv3BetterStairs == 1
+						JSR.W cv3_stair_controls_tick        ;0E8A91|20CAFF  |0FFFCA;
+						else
 						LDY.W r_entity_ID           ;0E8A91|AC4E05  |00054E;
+						endif
 						BEQ trevorStateMain                  ;0E8A94|F00C    |0E8AA2;
 						DEY                                  ;0E8A96|88      |      ;
 						BEQ symphaStateMain                  ;0E8A97|F017    |0E8AB0;
