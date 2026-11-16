@@ -157,6 +157,10 @@ base $EC04
  
 
 
+if !cv3PlayerControls == 1
+    incsrc "code/custom/player_controls_fixed.asm"
+endif
+
 assert pc() <= $ECDC    
 pad LAST_BANK+$CDC    ; mark free space gained 
 

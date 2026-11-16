@@ -1227,7 +1227,11 @@ endif
 						BMI roomVerticleChecks               ;0E8714|30BC    |0E86D2;
 	
 			CODE_0E8716:
+						if !cv3InvertedGravity == 1
+						JSR.W cv3_gravity_prepare_move_y      ;0E8716|20      |      ;
+						else
 						LDA.W r_entity_FractionalY         ;0E8716|ADDB04  |0E04DB;
+						endif
 						CLC                                  ;0E8719|18      |      ;
 						ADC.W r_entity_YsubSpd             ;0E871A|6D3705  |0E0537;
 						STA.W r_entity_FractionalY         ;0E871D|8DDB04  |0E04DB;
@@ -1650,11 +1654,12 @@ endif
 		selectCurPlayer:
 						LDA.B #$02                           ;0E8A8D|A902    |      ;
 						STA.B r_scrollDirection              ;0E8A8F|8565    |000065;
-						if !cv3BetterStairs == 1
-						JSR.W cv3_stair_controls_tick        ;0E8A91|20CAFF  |0FFFCA;
+						if !cv3PlayerControls == 1
+						JMP.W cv3_player_dispatch            ;0E8A91|4C      |      ;
 						else
 						LDY.W r_entity_ID           ;0E8A91|AC4E05  |00054E;
 						endif
+			cv3_player_native_dispatch:
 						BEQ trevorStateMain                  ;0E8A94|F00C    |0E8AA2;
 						DEY                                  ;0E8A96|88      |      ;
 						BEQ symphaStateMain                  ;0E8A97|F017    |0E8AB0;

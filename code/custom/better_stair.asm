@@ -68,12 +68,6 @@ cv3_stair_distance         = $12 ; 16-bit absolute displacement.
 cv3_stair_correction       = $14
 cv3_stair_slope            = $15 ; $00 ascends right, $40 ascends left.
 
-; Expanded PRG pair $22/$23, mapped at $8000-$BFFF.
-assert HEADER_PRG >= $12
-org $44000
-base $8000
-    DB cv3_stair_STAIR_CODE_PRG_BANK
-
 cv3_stair_controls_tick_update:
     ; Idle and in-progress stair steps need no repeated room-table search.
     LDA.B cv3_stair_joy_pressed
@@ -143,7 +137,7 @@ cv3_stair_controls_gameplay:
     CMP.B #cv3_stair_STATE_STAIR_MOVE
     BEQ cv3_stair_controls_validate
 
-; Keep jump and attack button presses ahead of staircase attachment.
+    ; Keep jump and attack button presses ahead of staircase attachment.
     LDA.B cv3_stair_joy_pressed
     AND.B #(cv3_stair_PAD_A | cv3_stair_PAD_B)
     BNE cv3_stair_controls_return
@@ -162,8 +156,8 @@ cv3_stair_controls_gameplay:
     BNE cv3_stair_controls_return
 
 cv3_stair_controls_airborne:
-; Allow a descending catch. A jump leaving the stairs keeps its ascent.
-; Phase zero includes the jump's stationary preparation frames.
+    ; Allow a descending catch. A jump leaving the stairs keeps its ascent.
+    ; Phase zero includes the jump's stationary preparation frames.
     LDA.W cv3_stair_player_phase
     BEQ cv3_stair_controls_return
     LDA.W cv3_stair_player_speed_y
@@ -178,7 +172,7 @@ cv3_stair_controls_on_stairs:
     LDA.B cv3_stair_joy_pressed
     AND.B #cv3_stair_PAD_A
     BEQ cv3_stair_controls_return
-; The character dispatcher runs its own jump-start handler this frame.
+    ; The character dispatcher runs its own jump-start handler this frame.
     LDA.B #cv3_stair_STATE_JUMP_START
     STA.W cv3_stair_player_state
 
@@ -195,7 +189,7 @@ cv3_stair_controls_validate:
     LDA.B cv3_stair_best_distance
     ORA.B cv3_stair_best_distance+1
     BNE cv3_stair_controls_valid
-; An endpoint permits movement back into the flight, not past its end.
+    ; An endpoint permits movement back into the flight, not past its end.
     LDA.W cv3_stair_player_state
     CMP.B #cv3_stair_STATE_STAIR_MOVE
     BEQ cv3_stair_controls_moving_direction
@@ -290,6 +284,7 @@ cv3_stair_find_record:
 
 cv3_stair_find_decode:
     JSR.W cv3_stair_decode_endpoint
+    JSR.W cv3_stair_normalize_upper_endpoint
     SEC
     LDA.B cv3_stair_player_x
     SBC.B cv3_stair_endpoint_x
@@ -298,7 +293,7 @@ cv3_stair_find_decode:
     SBC.B cv3_stair_endpoint_x+1
     STA.B cv3_stair_delta_x+1
 
-; At the player's X, an ascending-right line has Y = endpoint Y - dx.
+    ; At the player's X, an ascending-right line has Y = endpoint Y - dx.
     LDA.B cv3_stair_slope
     BNE cv3_stair_project_left
     SEC
@@ -333,7 +328,7 @@ cv3_stair_correction_negative:
     LDA.B cv3_stair_correction
     CMP.B #($100 - cv3_stair_ATTACH_TOLERANCE)
     BCS cv3_stair_find_bound
-; Falling can cross the whole contact band between two frames.
+    ; Falling can cross the whole contact band between two frames.
     LDA.W cv3_stair_player_state
     CMP.B #cv3_stair_STATE_JUMP
     BEQ cv3_stair_check_crossing
@@ -343,14 +338,15 @@ cv3_stair_correction_negative:
 cv3_stair_check_crossing:
     JSR.W cv3_stair_relative_fall_speed
     LDA.B cv3_stair_distance+1
-    BMI cv3_stair_find_next
-    BEQ cv3_stair_find_next
+    BMI cv3_stair_crossing_rejected
+    BEQ cv3_stair_crossing_rejected
     LDA.B #$00
     SEC
     SBC.B cv3_stair_correction
     CMP.B cv3_stair_distance+1
     BCC cv3_stair_find_bound
     BEQ cv3_stair_find_bound
+cv3_stair_crossing_rejected:
     JMP.W cv3_stair_find_next
 
 cv3_stair_correction_positive:
@@ -393,13 +389,23 @@ cv3_stair_measure_distance:
     STA.B cv3_stair_distance+1
 
 cv3_stair_compare_distance:
-; Both paths leave the distance high byte in A.
+    ; Both paths leave the distance high byte in A.
     CMP.B cv3_stair_best_distance+1
     BCC cv3_stair_remember_endpoint
     BNE cv3_stair_find_next
     LDA.B cv3_stair_distance
     CMP.B cv3_stair_best_distance
-    BCS cv3_stair_find_next
+    BCC cv3_stair_remember_endpoint
+    BNE cv3_stair_find_next
+    ; At a shared landing, prefer the flight enclosing the player when
+    ; its endpoint is as close as the adjacent flight's outside endpoint.
+    LDA.B cv3_stair_bounds
+    BPL cv3_stair_find_next
+    LDA.B cv3_stair_endpoint_flags
+    ASL A
+    EOR.B cv3_stair_endpoint_flags
+    EOR.B cv3_stair_delta_x+1
+    BMI cv3_stair_find_next
 
 cv3_stair_remember_endpoint:
     LDA.B cv3_stair_distance
@@ -430,20 +436,20 @@ cv3_stair_find_evaluate:
     BEQ cv3_stair_find_other_slope
     ORA.B cv3_stair_best_distance
     BEQ cv3_stair_find_inside
-; A lower endpoint points into the ascending half-line, an upper one
-; into the descending half-line. The nearest collinear endpoint bounds
-; a flight, including gaps between flights on the same diagonal.
+    ; A lower endpoint points into the ascending half-line, an upper one
+    ; into the descending half-line. The nearest collinear endpoint bounds
+    ; a flight, including gaps between flights on the same diagonal.
     LDA.B cv3_stair_bounds
     BMI cv3_stair_find_other_slope
 
 cv3_stair_find_inside:
-; Native room-edge stair transitions can have a single endpoint.
+    ; Native room-edge stair transitions can have a single endpoint.
     LDA.W cv3_stair_player_state
     CMP.B #cv3_stair_STATE_STAIR_IDLE
     BCS cv3_stair_find_success
-; Room-edge flights may have only one endpoint. The nearest endpoint's
-; inward-facing half-line also bounds those flights and rejects gaps.
-; An upward catch needs room for the first eight-pixel stair step.
+    ; Room-edge flights may have only one endpoint. The nearest endpoint's
+    ; inward-facing half-line also bounds those flights and rejects gaps.
+    ; An upward catch needs room for the first eight-pixel stair step.
     LDA.B cv3_stair_best_flags
     BPL cv3_stair_find_check_grounded
     LDA.B cv3_stair_best_distance+1
@@ -452,8 +458,8 @@ cv3_stair_find_inside:
     CMP.B #$08
     BCC cv3_stair_find_other_slope
 cv3_stair_find_check_grounded:
-; Grounded endpoint entry retains the original alignment animation.
-; Only idle, walk, jump and fall states reach this search.
+    ; Grounded endpoint entry retains the original alignment animation.
+    ; Only idle, walk, jump and fall states reach this search.
     LDA.W cv3_stair_player_state
     CMP.B #cv3_stair_STATE_JUMP
     BCS cv3_stair_find_success
@@ -530,14 +536,20 @@ cv3_stair_get_player_position:
     JMP.W cv3_stair_player_character_offset
 
 cv3_stair_player_vertical:
+    ; Screen Y can be above $33 while the camera is inside the room.
+    ; Keep the borrow until the camera offset and page have been added.
     LDA.W cv3_stair_screen_y
     SEC
     SBC.B #$33
-    BCC cv3_stair_find_failure
-    CLC
-    ADC.B cv3_stair_scroll_offset
     STA.B cv3_stair_player_y
     LDA.B #$00
+    SBC.B #$00
+    STA.B cv3_stair_player_y+1
+    CLC
+    LDA.B cv3_stair_player_y
+    ADC.B cv3_stair_scroll_offset
+    STA.B cv3_stair_player_y
+    LDA.B cv3_stair_player_y+1
     ADC.B #$00
     STA.B cv3_stair_player_y+1
     LDA.B cv3_stair_scroll_screen
@@ -549,12 +561,15 @@ cv3_stair_player_vertical:
     LDA.B cv3_stair_player_y+1
     ADC.B cv3_stair_endpoint_y+1
     STA.B cv3_stair_player_y+1
+    BPL cv3_stair_player_character_offset
+    CLC
+    RTS
 
 cv3_stair_player_character_offset:
     LDA.W cv3_stair_current_character
     CMP.B #cv3_stair_CHAR_GRANT
     BNE cv3_stair_player_ready
-; Grant's shorter sprite places its origin four pixels below the others.
+    ; Grant's shorter sprite places its origin four pixels below the others.
     SEC
     LDA.B cv3_stair_player_y
     SBC.B #$04
@@ -599,6 +614,98 @@ cv3_stair_decode_vertical:
     STA.B cv3_stair_endpoint_x+1
     RTS
 
+; Some vertical-room upper triggers sit one metatile into a wide platform.
+; For a consecutive lower/upper pair, project the lower flight to the upper
+; trigger's height. Keep the native table unchanged for walking onto stairs.
+; Delta/projected-position scratch is free until stair_find_decode resumes.
+cv3_stair_normalize_upper_endpoint:
+    LDA.B cv3_stair_room_metadata
+    BMI cv3_stair_normalize_check_upper
+    RTS
+cv3_stair_normalize_check_upper:
+    LDA.B cv3_stair_endpoint_flags
+    BMI cv3_stair_normalize_check_record
+    RTS
+cv3_stair_normalize_check_record:
+    CPY.B #$06
+    BCS cv3_stair_normalize_pair
+    RTS
+cv3_stair_normalize_pair:
+    LDA.B cv3_stair_endpoint_x
+    STA.B cv3_stair_delta_x
+    LDA.B cv3_stair_endpoint_x+1
+    STA.B cv3_stair_delta_x+1
+    LDA.B cv3_stair_endpoint_y
+    STA.B cv3_stair_projected_y
+    LDA.B cv3_stair_endpoint_y+1
+    STA.B cv3_stair_projected_y+1
+    TYA
+    PHA
+    LDA.B cv3_stair_endpoint_flags
+    PHA
+    TYA
+    SEC
+    SBC.B #$06
+    TAY
+    JSR.W cv3_stair_read_record
+    JSR.W cv3_stair_decode_endpoint
+    LDX.B cv3_stair_endpoint_flags
+    PLA
+    STA.B cv3_stair_endpoint_flags
+    TXA
+    EOR.B cv3_stair_endpoint_flags
+    AND.B #$C0
+    CMP.B #$80
+    BNE cv3_stair_normalize_restore
+    SEC
+    LDA.B cv3_stair_endpoint_y
+    SBC.B cv3_stair_projected_y
+    STA.B cv3_stair_distance
+    LDA.B cv3_stair_endpoint_y+1
+    SBC.B cv3_stair_projected_y+1
+    BNE cv3_stair_normalize_restore
+    LDA.B cv3_stair_distance
+    BEQ cv3_stair_normalize_restore
+    LDA.B cv3_stair_endpoint_flags
+    AND.B #$40
+    BNE cv3_stair_normalize_left
+    CLC
+    LDA.B cv3_stair_endpoint_x
+    ADC.B cv3_stair_distance
+    BCS cv3_stair_normalize_restore
+    JMP.W cv3_stair_normalize_compare
+cv3_stair_normalize_left:
+    SEC
+    LDA.B cv3_stair_endpoint_x
+    SBC.B cv3_stair_distance
+    BCC cv3_stair_normalize_restore
+cv3_stair_normalize_compare:
+    STA.B cv3_stair_distance
+    SEC
+    SBC.B cv3_stair_delta_x
+    BCS cv3_stair_normalize_distance
+    EOR.B #$FF
+    CLC
+    ADC.B #$01
+cv3_stair_normalize_distance:
+    CMP.B #$20
+    BNE cv3_stair_normalize_restore
+    LDA.B cv3_stair_distance
+    STA.B cv3_stair_delta_x
+cv3_stair_normalize_restore:
+    LDA.B cv3_stair_delta_x
+    STA.B cv3_stair_endpoint_x
+    LDA.B cv3_stair_delta_x+1
+    STA.B cv3_stair_endpoint_x+1
+    LDA.B cv3_stair_projected_y
+    STA.B cv3_stair_endpoint_y
+    LDA.B cv3_stair_projected_y+1
+    STA.B cv3_stair_endpoint_y+1
+    PLA
+    TAY
+cv3_stair_normalize_done:
+    RTS
+
 ; A = page, endpoint Y = page * 240 = page * 256 - page * 16.
 ; Page values fit in a nibble. X is temporary, Y is preserved.
 cv3_stair_scale_vertical_page:
@@ -623,8 +730,8 @@ cv3_stair_attach:
     LDA.W cv3_stair_screen_y
     ADC.B cv3_stair_best_correction
     STA.W cv3_stair_screen_y
-; Match the eight-pixel step lattice used by the original stair handler.
-; Move X and Y together to remain on the selected 45-degree flight.
+    ; Match the eight-pixel step lattice used by the original stair handler.
+    ; Move X and Y together to remain on the selected 45-degree flight.
     LDA.B cv3_stair_player_x
     AND.B #$07
     STA.B cv3_stair_distance
@@ -662,10 +769,11 @@ cv3_stair_attach_y:
     SEC
     RTS
 
-assert pc() <= $C000
 
-org $1FFCB
-base $BFCB
+pushPC
+; $BFCB is the native terminator for room $0E/$02/$01.
+org $1FFCC
+base $BFCC
 ; Y advances to the next record. The terminator has no coordinate bytes.
 cv3_stair_read_record_data:
     LDA.B (cv3_stair_room_stairs),Y
@@ -683,38 +791,4 @@ cv3_stair_read_record_done:
     RTS
 
 assert pc() <= $C000
-
-; These trampolines execute in the permanently mapped final 8 KiB bank.
-; The bank setter preserves carry so attachment survives the return switch.
-org LAST_BANK+$1FCA
-base $FFCA
-cv3_stair_controls_tick:
-    PHP
-    PHA
-    TXA
-    PHA
-    LDA.B cv3_stair_lower_prg_bank
-    PHA
-    LDA.B #cv3_stair_STAIR_CODE_PRG_BANK
-    JSR.W cv3_stair_set_lower_prg_bank
-    JSR.W cv3_stair_controls_tick_update
-    PLA
-    JSR.W cv3_stair_set_lower_prg_bank
-    BCC cv3_stair_controls_tick_restore
-    JSR.W cv3_stair_start_stair_ascent
-cv3_stair_controls_tick_restore:
-    PLA
-    TAX
-    PLA
-    PLP
-    LDY.W cv3_stair_current_character
-    RTS
-
-; Read one record while the room's original stair-data bank is mapped.
-cv3_stair_read_record:
-    LDA.B #cv3_stair_STAIRS_PRG_BANK
-    JSR.W cv3_stair_set_lower_prg_bank
-    JSR.W cv3_stair_read_record_data
-    LDA.B #cv3_stair_STAIR_CODE_PRG_BANK
-    JMP.W cv3_stair_set_lower_prg_bank
-assert pc() <= $FFFA
+pullPC

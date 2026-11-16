@@ -73,8 +73,8 @@ cv3_horizontal_scroll_tick:
 cv3_horizontal_scroll_forced:
     STA.B cv3_scroll_scroll_direction
     TAY
-; The native camera integrates the player's speed. Lend it the forced
-; speed for this call, then restore both bytes before entity processing.
+    ; The native camera integrates the player's speed. Lend it the forced
+    ; speed for this call, then restore both bytes before entity processing.
     LDA.W cv3_scroll_player_speed_x
     PHA
     LDA.W cv3_scroll_player_subspeed_x
@@ -89,8 +89,8 @@ cv3_horizontal_scroll_forced:
     PLA
     STA.W cv3_scroll_player_speed_x
 
-; Use the actual displacement, including room-end clamping and the
-; fractional accumulator. Other entities already consume scroll_delta.
+    ; Use the actual displacement, including room-end clamping and the
+    ; fractional accumulator. Other entities already consume scroll_delta.
     LDA.B cv3_scroll_scroll_delta
     BEQ cv3_horizontal_scroll_done
     BMI cv3_horizontal_scroll_camera_left
