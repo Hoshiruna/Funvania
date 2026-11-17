@@ -1,6 +1,5 @@
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Hoshiruna
-; Adapted from cv3-asm/asm/US/better_stair.asm for Funvania's Asar layout.
 ; Target CPU is the NES Ricoh 2A03. See LICENSE in this directory.
 
 cv3_stair_game_state             = r_gameState
@@ -47,6 +46,7 @@ cv3_stair_STAIRS_PRG_BANK        = $8E ; MMC5 16 KiB pair $0E/$0F.
 cv3_stair_STAIR_CODE_PRG_BANK    = $A2 ; MMC5 16 KiB pair $22/$23.
 cv3_stair_ATTACH_TOLERANCE       = $01
 cv3_stair_STAIR_POSITION_CHECKED = $80 ; Cached only while idle on a staircase.
+cv3_stair_SCRIPTED_STAIR_TABLE   = $BD2E ; Room $08/$03/$00, first flight exits upward.
 
 cv3_stair_set_lower_prg_bank     = swapPRGbankStore
 cv3_stair_start_stair_ascent     = updateWeaponFacingSpeed_00 ; Sets animation, facing, X/Y speed and state $14.
@@ -69,13 +69,13 @@ cv3_stair_correction       = $14
 cv3_stair_slope            = $15 ; $00 ascends right, $40 ascends left.
 
 cv3_stair_controls_tick_update:
-    ; Idle and in-progress stair steps need no repeated room-table search.
+    ; Let the native handler finish each step and its landing checks.
     LDA.B cv3_stair_joy_pressed
     AND.B #cv3_stair_PAD_A
     BNE cv3_stair_controls_call
     LDA.W cv3_stair_player_state
     CMP.B #cv3_stair_STATE_STAIR_MOVE
-    BEQ cv3_stair_controls_step
+    BEQ cv3_stair_controls_restore
     CMP.B #cv3_stair_STATE_STAIR_IDLE
     BEQ cv3_stair_controls_idle
     CMP.B #cv3_stair_STATE_APPROACH_STAIRS
@@ -85,10 +85,6 @@ cv3_stair_controls_tick_update:
     LDA.B cv3_stair_joy_held
     AND.B #(cv3_stair_PAD_UP | cv3_stair_PAD_DOWN)
     CMP.B #cv3_stair_PAD_UP
-    BNE cv3_stair_controls_restore
-    BEQ cv3_stair_controls_call
-cv3_stair_controls_step:
-    LDA.W cv3_stair_player_stair_step
     BNE cv3_stair_controls_restore
     BEQ cv3_stair_controls_call
 cv3_stair_controls_idle:
@@ -123,10 +119,18 @@ cv3_stair_controls_check_substate:
     BEQ cv3_stair_controls_gameplay
     CMP.B #$0A
     BEQ cv3_stair_controls_gameplay
+    CMP.B #$16
+    BEQ cv3_stair_controls_gameplay
     CLC
     RTS
 
 cv3_stair_controls_gameplay:
+    JSR.W cv3_stair_is_scripted_flight
+    BCC cv3_stair_controls_free_flight
+    ; Keep native entry, climbing and the forced transition on this flight.
+    CLC
+    RTS
+cv3_stair_controls_free_flight:
     LDA.W cv3_stair_player_state
     CMP.B #cv3_stair_STATE_APPROACH_STAIRS
     BEQ cv3_stair_controls_on_stairs
@@ -135,7 +139,7 @@ cv3_stair_controls_gameplay:
     CMP.B #cv3_stair_STATE_STAIR_IDLE
     BEQ cv3_stair_controls_validate
     CMP.B #cv3_stair_STATE_STAIR_MOVE
-    BEQ cv3_stair_controls_validate
+    BEQ cv3_stair_controls_on_stairs
 
     ; Keep jump and attack button presses ahead of staircase attachment.
     LDA.B cv3_stair_joy_pressed
@@ -190,9 +194,46 @@ cv3_stair_controls_validate:
     ORA.B cv3_stair_best_distance+1
     BNE cv3_stair_controls_valid
     ; An endpoint permits movement back into the flight, not past its end.
-    LDA.W cv3_stair_player_state
-    CMP.B #cv3_stair_STATE_STAIR_MOVE
-    BEQ cv3_stair_controls_moving_direction
+    LDA.B cv3_stair_joy_held
+    AND.B #$0F
+    BEQ cv3_stair_controls_valid
+    JSR.W cv3_stair_input_direction
+    EOR.B cv3_stair_best_flags
+    BPL cv3_stair_controls_fall
+cv3_stair_controls_valid:
+    LDA.W cv3_stair_player_phase
+    ORA.B #cv3_stair_STAIR_POSITION_CHECKED
+    STA.W cv3_stair_player_phase
+    JMP.W cv3_stair_controls_return
+
+; Only the first flight in this table occupies world X $0340-$0390.
+; Leave its controls to the native handlers, including jump-button handling.
+cv3_stair_is_scripted_flight:
+    LDA.B cv3_stair_room_stairs
+    CMP.B #(cv3_stair_SCRIPTED_STAIR_TABLE&$FF)
+    BNE cv3_stair_scripted_not_found
+    LDA.B cv3_stair_room_stairs+1
+    CMP.B #(cv3_stair_SCRIPTED_STAIR_TABLE>>8)
+    BNE cv3_stair_scripted_not_found
+    JSR.W cv3_stair_get_player_position
+    BCC cv3_stair_scripted_not_found
+    LDA.B cv3_stair_player_x+1
+    CMP.B #$03
+    BNE cv3_stair_scripted_not_found
+    LDA.B cv3_stair_player_x
+    CMP.B #$40
+    BCC cv3_stair_scripted_not_found
+    CMP.B #$91
+    BCS cv3_stair_scripted_not_found
+    SEC
+    RTS
+cv3_stair_scripted_not_found:
+    CLC
+    RTS
+
+; Return $80 for ascent and $00 for descent, using native input priority.
+; With no direction held, retain the last step's vertical direction.
+cv3_stair_input_direction:
     LDA.B cv3_stair_joy_held
     LSR A
     BCS cv3_stair_controls_right
@@ -201,9 +242,9 @@ cv3_stair_controls_validate:
     LSR A
     BCS cv3_stair_controls_down
     LSR A
-    BCC cv3_stair_controls_valid
-    LDA.B #$80
-    BNE cv3_stair_controls_endpoint_direction
+    BCS cv3_stair_controls_up
+    LDA.W cv3_stair_player_speed_y
+    RTS
 cv3_stair_controls_right:
     LDA.W cv3_stair_player_stair_direction
     EOR.B #$01
@@ -214,20 +255,10 @@ cv3_stair_controls_left:
     BEQ cv3_stair_controls_down
 cv3_stair_controls_up:
     LDA.B #$80
-    BNE cv3_stair_controls_endpoint_direction
+    RTS
 cv3_stair_controls_down:
     LDA.B #$00
-    BEQ cv3_stair_controls_endpoint_direction
-cv3_stair_controls_moving_direction:
-    LDA.W cv3_stair_player_speed_y
-cv3_stair_controls_endpoint_direction:
-    EOR.B cv3_stair_best_flags
-    BPL cv3_stair_controls_fall
-cv3_stair_controls_valid:
-    LDA.W cv3_stair_player_phase
-    ORA.B #cv3_stair_STAIR_POSITION_CHECKED
-    STA.W cv3_stair_player_phase
-    JMP.W cv3_stair_controls_return
+    RTS
 
 cv3_stair_controls_fall:
     LDA.B #cv3_stair_STATE_FALL
@@ -285,41 +316,7 @@ cv3_stair_find_record:
 cv3_stair_find_decode:
     JSR.W cv3_stair_decode_endpoint
     JSR.W cv3_stair_normalize_upper_endpoint
-    SEC
-    LDA.B cv3_stair_player_x
-    SBC.B cv3_stair_endpoint_x
-    STA.B cv3_stair_delta_x
-    LDA.B cv3_stair_player_x+1
-    SBC.B cv3_stair_endpoint_x+1
-    STA.B cv3_stair_delta_x+1
-
-    ; At the player's X, an ascending-right line has Y = endpoint Y - dx.
-    LDA.B cv3_stair_slope
-    BNE cv3_stair_project_left
-    SEC
-    LDA.B cv3_stair_endpoint_y
-    SBC.B cv3_stair_delta_x
-    STA.B cv3_stair_projected_y
-    LDA.B cv3_stair_endpoint_y+1
-    SBC.B cv3_stair_delta_x+1
-    JMP.W cv3_stair_project_compare
-
-cv3_stair_project_left:
-    CLC
-    LDA.B cv3_stair_endpoint_y
-    ADC.B cv3_stair_delta_x
-    STA.B cv3_stair_projected_y
-    LDA.B cv3_stair_endpoint_y+1
-    ADC.B cv3_stair_delta_x+1
-
-cv3_stair_project_compare:
-    STA.B cv3_stair_projected_y+1
-    SEC
-    LDA.B cv3_stair_projected_y
-    SBC.B cv3_stair_player_y
-    STA.B cv3_stair_correction
-    LDA.B cv3_stair_projected_y+1
-    SBC.B cv3_stair_player_y+1
+    JSR.W cv3_stair_project_endpoint
     BEQ cv3_stair_correction_positive
     CMP.B #$FF
     BEQ cv3_stair_correction_negative
@@ -352,7 +349,8 @@ cv3_stair_crossing_rejected:
 cv3_stair_correction_positive:
     LDA.B cv3_stair_correction
     CMP.B #(cv3_stair_ATTACH_TOLERANCE + 1)
-    BCS cv3_stair_find_next
+    BCC cv3_stair_find_bound
+    JMP.W cv3_stair_find_next
 
 cv3_stair_find_bound:
     LDA.B cv3_stair_delta_x
@@ -397,6 +395,16 @@ cv3_stair_compare_distance:
     CMP.B cv3_stair_best_distance
     BCC cv3_stair_remember_endpoint
     BNE cv3_stair_find_next
+    ; Joined flights share an upper/lower endpoint. Choose the flight
+    ; entered by the requested direction before rejecting an outward step.
+    LDA.B cv3_stair_distance
+    ORA.B cv3_stair_distance+1
+    BNE cv3_stair_compare_inside
+    JSR.W cv3_stair_input_direction
+    EOR.B cv3_stair_endpoint_flags
+    BMI cv3_stair_remember_endpoint
+    BPL cv3_stair_find_next
+cv3_stair_compare_inside:
     ; At a shared landing, prefer the flight enclosing the player when
     ; its endpoint is as close as the adjacent flight's outside endpoint.
     LDA.B cv3_stair_bounds
@@ -486,6 +494,42 @@ cv3_stair_find_other_slope:
 
 cv3_stair_find_failure:
     CLC
+    RTS
+
+; Project the endpoint's diagonal onto player X. A is the signed correction
+; high byte, stair_correction is its low byte, and Y keeps the table cursor.
+cv3_stair_project_endpoint:
+    SEC
+    LDA.B cv3_stair_player_x
+    SBC.B cv3_stair_endpoint_x
+    STA.B cv3_stair_delta_x
+    LDA.B cv3_stair_player_x+1
+    SBC.B cv3_stair_endpoint_x+1
+    STA.B cv3_stair_delta_x+1
+    LDA.B cv3_stair_slope
+    BNE cv3_stair_project_left
+    SEC
+    LDA.B cv3_stair_endpoint_y
+    SBC.B cv3_stair_delta_x
+    STA.B cv3_stair_projected_y
+    LDA.B cv3_stair_endpoint_y+1
+    SBC.B cv3_stair_delta_x+1
+    JMP.W cv3_stair_project_compare
+cv3_stair_project_left:
+    CLC
+    LDA.B cv3_stair_endpoint_y
+    ADC.B cv3_stair_delta_x
+    STA.B cv3_stair_projected_y
+    LDA.B cv3_stair_endpoint_y+1
+    ADC.B cv3_stair_delta_x+1
+cv3_stair_project_compare:
+    STA.B cv3_stair_projected_y+1
+    SEC
+    LDA.B cv3_stair_projected_y
+    SBC.B cv3_stair_player_y
+    STA.B cv3_stair_correction
+    LDA.B cv3_stair_projected_y+1
+    SBC.B cv3_stair_player_y+1
     RTS
 
 ; Relative downward travel across the diagonal, rounded up to whole pixels.
@@ -619,6 +663,27 @@ cv3_stair_decode_vertical:
 ; trigger's height. Keep the native table unchanged for walking onto stairs.
 ; Delta/projected-position scratch is free until stair_find_decode resumes.
 cv3_stair_normalize_upper_endpoint:
+    ; Keep a raw upper trigger when the attached player follows its line.
+    ; Otherwise normalize it so adjacent flights retain their shared end.
+    LDA.W cv3_stair_player_state
+    CMP.B #cv3_stair_STATE_STAIR_IDLE
+    BCC cv3_stair_normalize_room
+    LDA.B cv3_stair_endpoint_flags
+    BPL cv3_stair_normalize_room
+    JSR.W cv3_stair_project_endpoint
+    BEQ cv3_stair_normalize_raw_positive
+    CMP.B #$FF
+    BNE cv3_stair_normalize_room
+    LDA.B cv3_stair_correction
+    CMP.B #($100 - cv3_stair_ATTACH_TOLERANCE)
+    BCC cv3_stair_normalize_room
+    RTS
+cv3_stair_normalize_raw_positive:
+    LDA.B cv3_stair_correction
+    CMP.B #(cv3_stair_ATTACH_TOLERANCE + 1)
+    BCS cv3_stair_normalize_room
+    RTS
+cv3_stair_normalize_room:
     LDA.B cv3_stair_room_metadata
     BMI cv3_stair_normalize_check_upper
     RTS
