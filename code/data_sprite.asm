@@ -362,7 +362,7 @@ org $3423E
 base $823E
  
       mainSpriteAssem:
-            if !cv3ClimbableRope == 1
+            if !cv3ClimbableRope == 1 && !expandCHR == 1
             dw cv3_trevor_rope_pose_table        ;0D823E|        |      ;
             else
             dw spriteList_trevor_00              ;0D823E|        |0D825C; 
@@ -379,7 +379,7 @@ base $823E
             dw spriteList_enemy_09               ;0D8250|        |0D8CE9;
             dw spriteList_enemy_0a               ;0D8252|        |0DACE7;
             
-            if !cv3ClimbableRope == 1
+            if !cv3ClimbableRope == 1 && !expandCHR == 1
             dw cv3_trevor_rope_pose_table        ;0D8254|        |      ;
             else
             dw spriteList_trevor_00              ;0D8254|        |0D825C; 
@@ -5304,21 +5304,12 @@ endif
   
         spr_06_b8:
             db $02                               
-            if !cv3ClimbableRope == 1
-            db $F0,$BB,$03,$F8
-            db $F1,$BD,$00
-            else
             db $F0,$6A,$03,$F8                   
             db $F1,$6C,$00                       
-            endif
   
         spr_06_b9:
             db $01                               
-            if !cv3ClimbableRope == 1
-            db $F0,$BF,$00,$F8
-            else
             db $F0,$6E,$00,$F8                   
-            endif
   
         spr_06_ba:
             db $02                               
@@ -6753,11 +6744,7 @@ endif
   
   spr_0A_borderPWselect_21:
             db $02                              
-            if !cv3ClimbableRope == 1
-            db $F0,$B9,$41,$F8
-            else
             db $F0,$64,$41,$F8                  
-            endif
             db $F1,$62,$00                      
 
 }
@@ -6770,7 +6757,7 @@ base $BE63
 endif 
 ; free space for sprites ------------------------------------------------------------------- 
 
-if !cv3ClimbableRope == 1
+if !cv3ClimbableRope == 1 && !expandCHR == 1
     incsrc "code/custom/trevor_rope_sprites.asm"
 endif
 if !cv3InvertedGravity == 1

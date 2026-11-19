@@ -89,7 +89,11 @@ base $E0DF                          ;
       PLA 
       RTS 
 
-assert pc() <= $E103                
+if !cv3ClimbCHR == 1
+    assert pc() <= $E0F2            ; space for Trevor's CHR check
+else
+    assert pc() <= $E103
+endif
 pad LAST_BANK+$103                  
 
 
@@ -161,8 +165,8 @@ if !cv3PlayerControls == 1
     incsrc "code/custom/player_controls_fixed.asm"
 endif
 
-if !cv3BetterStairs == 1 && !expandCHR == 1
-    incsrc "code/custom/trevor_stair_sprites.asm"
+if !cv3ClimbCHR == 1
+    incsrc "code/custom/trevor_climb_chr.asm"
 endif
 
 assert pc() <= $ECDC    

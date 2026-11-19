@@ -383,10 +383,15 @@ cv3_rope_foot_probe:
     DB $11, $11, $0D, $11
 
 ; Two OAM-spec frames per character, eight moved pixels per frame.
-; Trevor uses the appended climbing poses. Other characters use idle.
+; Trevor uses the native stair poses when CHR expansion is disabled.
 cv3_rope_pose_indices:
+if !expandCHR == 1
     DB $70, $02, $02, $02 ; First frame.
     DB $72, $02, $02, $02 ; Second frame.
+else
+    DB $0A, $02, $02, $02
+    DB $0C, $02, $02, $02
+endif
 
 ; Each record is stage, block, room, followed by 16-bit little-endian X,
 ; top Y and bottom Y. The three IDs match RAM $32/$33/$34.

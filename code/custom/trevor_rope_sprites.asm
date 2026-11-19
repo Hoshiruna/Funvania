@@ -68,31 +68,3 @@ cv3_trevor_rope_frame_1:
 cv3_trevor_rope_frame_2:
             db $04,$E0,$64,$00,$F8,$E1,$6A,$00
             db $01,$6C,$F8,$01,$6E,$00
-
-pushPC
-; Keep name/password graphics in unused 8x16 slots of CHR bank $42.
-org ROM_CHRstart+($42*$400)+$380
-    incbin "rom/Castlevania_3.nes":$40650..$40670
-org ROM_CHRstart+($42*$400)+$3A0
-    incbin "rom/Castlevania_3.nes":$406B0..$406D0
-org ROM_CHRstart+($42*$400)+$3C0
-    incbin "rom/Castlevania_3.nes":$406D0..$406F0
-org ROM_CHRstart+($42*$400)+$3E0
-    incbin "rom/Castlevania_3.nes":$406F0..$40710
-org ROM_CHRstart+$400+$A0
-    incbin "gfx/CHR/trevor_climb.chr":$0..$20
-org ROM_CHRstart+$400+$300
-    incbin "gfx/CHR/trevor_climb.chr":$20..$40
-org ROM_CHRstart+$400+$320
-    incbin "gfx/CHR/trevor_climb.chr":$40..$60
-org ROM_CHRstart+$400+$200
-    incbin "gfx/CHR/trevor_climb.chr":$60..$80
-org ROM_CHRstart+$400+$240
-    incbin "gfx/CHR/trevor_climb.chr":$80..$A0
-org ROM_CHRstart+$400+$2A0
-    incbin "gfx/CHR/trevor_climb.chr":$A0..$C0
-org ROM_CHRstart+$400+$2C0
-    incbin "gfx/CHR/trevor_climb.chr":$C0..$E0
-org ROM_CHRstart+$400+$2E0
-    incbin "gfx/CHR/trevor_climb.chr":$E0..$100
-pullPC

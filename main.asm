@@ -81,6 +81,7 @@ org ROM_CHRstart+ROM_CHRsize
 }
 
 !cv3PlayerControls = (!cv3BetterStairs|!cv3ClimbableRope|!cv3InvertedGravity)
+!cv3ClimbCHR = (!expandCHR&(!cv3BetterStairs|!cv3ClimbableRope))
 
 { ; text symbols game 
 
