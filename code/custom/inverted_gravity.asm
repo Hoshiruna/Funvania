@@ -60,7 +60,7 @@ cv3_gravity_player_done:
 cv3_gravity_player_disable:
     LDA.W cv3_gravity_player_stair_alignment
     BPL cv3_gravity_player_done
-    AND.B #($FF ^ cv3_gravity_GRAVITY_ACTIVE)
+    AND.B #($FF^cv3_gravity_GRAVITY_ACTIVE)
     STA.W cv3_gravity_player_stair_alignment
     JSR.W cv3_gravity_begin_fall
     RTS

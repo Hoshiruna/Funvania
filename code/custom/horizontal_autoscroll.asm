@@ -29,15 +29,12 @@ cv3_scroll_SCREEN_RIGHT               = $E8
 ; Unsigned 8.8 pixels per frame, from $0001 through $0100 (one pixel).
 ; The native column renderer needs several frames to prepare each column.
 cv3_scroll_HORIZONTAL_SCROLL_SPEED    = !cv3HorizontalScrollSpeed
+cv3_scroll_LEFTWARD_SPEED             = $10000-cv3_scroll_HORIZONTAL_SCROLL_SPEED ; 16-bit two's complement.
 
 assert cv3_scroll_HORIZONTAL_SCROLL_SPEED >= $0001
 assert cv3_scroll_HORIZONTAL_SCROLL_SPEED <= $0100
 
-cv3_scroll_native_player_scroll_check = cv3_horizontal_native_player_scroll_check
-cv3_scroll_native_player_move = stopScroll_if_boss_87
 cv3_scroll_native_scroll_continue = $D179
-cv3_scroll_native_player_wall_check = CODE_0E915E ; A = signed X probe, carry set when blocked.
-cv3_scroll_native_player_death = initPlayerDeath
 cv3_scroll_set_lower_prg_bank = swapPRGbankStore
 cv3_scroll_native_tile_collision = playerCollusionCheck ; A = signed X offset, X = signed Y offset.
 cv3_scroll_PLAYER_PRG_BANK = $9C ; MMC5 16 KiB pair $1C/$1D.
@@ -60,9 +57,9 @@ cv3_horizontal_player_camera:
     JSR.W cv3_horizontal_scroll_room
     CMP.B #cv3_scroll_SCROLL_DISABLED
     BNE cv3_horizontal_player_move
-    JMP.W cv3_scroll_native_player_scroll_check
+    JMP.W cv3_horizontal_native_player_scroll_check
 cv3_horizontal_player_move:
-    JMP.W cv3_scroll_native_player_move
+    JMP.W stopScroll_if_boss_87
 
 cv3_horizontal_scroll_tick:
     JSR.W cv3_horizontal_scroll_room
@@ -110,7 +107,7 @@ cv3_horizontal_scroll_camera_left:
     LDA.W cv3_scroll_player_x
     SBC.B cv3_scroll_scroll_delta
     BCS cv3_horizontal_scroll_clamp_right
-    CMP.B #(cv3_scroll_SCREEN_RIGHT + 1)
+    CMP.B #(cv3_scroll_SCREEN_RIGHT+1)
     BCC cv3_horizontal_scroll_store_x
 cv3_horizontal_scroll_clamp_right:
     LDA.B #cv3_scroll_SCREEN_RIGHT
@@ -139,10 +136,10 @@ cv3_horizontal_scroll_probe_wall:
     LDY.B cv3_scroll_player_collision_shape
     CPY.B #$08
     BEQ cv3_horizontal_scroll_probe_bat
-    JSR.W cv3_scroll_native_player_wall_check
+    JSR.W CODE_0E915E ; A = signed X probe, carry set when blocked.
     BCC cv3_horizontal_scroll_restore_bank
 cv3_horizontal_scroll_crushed:
-    JSR.W cv3_scroll_native_player_death
+    JSR.W initPlayerDeath
 cv3_horizontal_scroll_restore_bank:
     PLA
     JMP.W cv3_scroll_set_lower_prg_bank
@@ -225,9 +222,9 @@ cv3_horizontal_scroll_disabled:
     RTS
 
 cv3_horizontal_speed_fraction:
-    DB ((-cv3_scroll_HORIZONTAL_SCROLL_SPEED) & $FF), (cv3_scroll_HORIZONTAL_SCROLL_SPEED & $FF)
+    DB cv3_scroll_LEFTWARD_SPEED&$FF,cv3_scroll_HORIZONTAL_SCROLL_SPEED&$FF
 cv3_horizontal_speed_integer:
-    DB (((-cv3_scroll_HORIZONTAL_SCROLL_SPEED) >> 8) & $FF), (cv3_scroll_HORIZONTAL_SCROLL_SPEED >> 8)
+    DB cv3_scroll_LEFTWARD_SPEED>>8,cv3_scroll_HORIZONTAL_SCROLL_SPEED>>8
 
 ; Each record is stage ($32), block ($33), room ($34), direction.
 ; These are internal zero-based IDs. The table is intentionally empty until
@@ -239,4 +236,4 @@ cv3_horizontal_scroll_rooms:
     DB $FF
 cv3_horizontal_scroll_rooms_end:
 
-assert (cv3_horizontal_scroll_rooms_end - cv3_horizontal_scroll_rooms) <= $FD
+assert (cv3_horizontal_scroll_rooms_end-cv3_horizontal_scroll_rooms) <= $FD

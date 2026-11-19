@@ -80,12 +80,12 @@ cv3_rope_controls_check_drop:
     AND.B #cv3_stair_PAD_DOWN
     BNE cv3_rope_controls_unused
     LDA.W cv3_stair_player_phase
-    AND.B #($FF ^ cv3_rope_ROPE_DROP_LOCK)
+    AND.B #($FF^cv3_rope_ROPE_DROP_LOCK)
     STA.W cv3_stair_player_phase
 cv3_rope_controls_grab_buttons:
     ; A held prevents catching the rope during jump preparation.
     LDA.B cv3_stair_joy_held
-    AND.B #(cv3_stair_PAD_A | cv3_stair_PAD_UP | cv3_stair_PAD_DOWN)
+    AND.B #(cv3_stair_PAD_A|cv3_stair_PAD_UP|cv3_stair_PAD_DOWN)
     CMP.B #cv3_stair_PAD_UP
     BEQ cv3_rope_controls_grab_direction
     CMP.B #cv3_stair_PAD_DOWN
@@ -147,7 +147,7 @@ cv3_rope_controls_attached:
     JSR.W cv3_stair_get_player_position
     BCC cv3_rope_controls_lost
     LDY.W cv3_stair_player_phase
-    CPY.B #(cv3_rope_segments_end - cv3_rope_segments - 1)
+    CPY.B #(cv3_rope_segments_end-cv3_rope_segments-1)
     BCS cv3_rope_controls_lost
     JSR.W cv3_rope_record_matches
     BCS cv3_rope_controls_input
@@ -178,7 +178,7 @@ cv3_rope_controls_drop:
 cv3_rope_controls_hold:
     JSR.W cv3_rope_clear_motion
     LDA.B cv3_stair_joy_held
-    AND.B #(cv3_stair_PAD_UP | cv3_stair_PAD_DOWN)
+    AND.B #(cv3_stair_PAD_UP|cv3_stair_PAD_DOWN)
     CMP.B #cv3_stair_PAD_UP
     BEQ cv3_rope_controls_up
     CMP.B #cv3_stair_PAD_DOWN
@@ -259,12 +259,12 @@ cv3_rope_record_matches:
     CMP.B #$FF
     BNE cv3_rope_record_miss
     LDA.B cv3_rope_delta_x
-    CMP.B #($100 - cv3_rope_ROPE_ATTACH_TOLERANCE)
+    CMP.B #($100-cv3_rope_ROPE_ATTACH_TOLERANCE)
     BCC cv3_rope_record_miss
     BCS cv3_rope_record_y
 cv3_rope_record_right:
     LDA.B cv3_rope_delta_x
-    CMP.B #(cv3_rope_ROPE_ATTACH_TOLERANCE + 1)
+    CMP.B #(cv3_rope_ROPE_ATTACH_TOLERANCE+1)
     BCS cv3_rope_record_miss
 cv3_rope_record_y:
     LDA.B cv3_stair_player_y+1

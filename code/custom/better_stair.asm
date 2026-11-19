@@ -49,7 +49,6 @@ cv3_stair_STAIR_POSITION_CHECKED = $80 ; Cached only while idle on a staircase.
 cv3_stair_SCRIPTED_STAIR_TABLE   = $BD2E ; Room $08/$03/$00, first flight exits upward.
 
 cv3_stair_set_lower_prg_bank     = swapPRGbankStore
-cv3_stair_start_stair_ascent     = updateWeaponFacingSpeed_00 ; Sets animation, facing, X/Y speed and state $14.
 
 ; Scratch bytes live only during the stair tick, before state dispatch.
 ; The original state handlers reuse this same temporary zero-page area.
@@ -83,7 +82,7 @@ cv3_stair_controls_tick_update:
     CMP.B #cv3_stair_STATE_ENTER_STAIRS
     BEQ cv3_stair_controls_restore
     LDA.B cv3_stair_joy_held
-    AND.B #(cv3_stair_PAD_UP | cv3_stair_PAD_DOWN)
+    AND.B #(cv3_stair_PAD_UP|cv3_stair_PAD_DOWN)
     CMP.B #cv3_stair_PAD_UP
     BNE cv3_stair_controls_restore
     BEQ cv3_stair_controls_call
@@ -143,10 +142,10 @@ cv3_stair_controls_free_flight:
 
     ; Keep jump and attack button presses ahead of staircase attachment.
     LDA.B cv3_stair_joy_pressed
-    AND.B #(cv3_stair_PAD_A | cv3_stair_PAD_B)
+    AND.B #(cv3_stair_PAD_A|cv3_stair_PAD_B)
     BNE cv3_stair_controls_return
     LDA.B cv3_stair_joy_held
-    AND.B #(cv3_stair_PAD_UP | cv3_stair_PAD_DOWN)
+    AND.B #(cv3_stair_PAD_UP|cv3_stair_PAD_DOWN)
     CMP.B #cv3_stair_PAD_UP
     BNE cv3_stair_controls_return
     LDA.W cv3_stair_player_state
@@ -323,7 +322,7 @@ cv3_stair_find_decode:
     JMP.W cv3_stair_find_next
 cv3_stair_correction_negative:
     LDA.B cv3_stair_correction
-    CMP.B #($100 - cv3_stair_ATTACH_TOLERANCE)
+    CMP.B #($100-cv3_stair_ATTACH_TOLERANCE)
     BCS cv3_stair_find_bound
     ; Falling can cross the whole contact band between two frames.
     LDA.W cv3_stair_player_state
@@ -348,7 +347,7 @@ cv3_stair_crossing_rejected:
 
 cv3_stair_correction_positive:
     LDA.B cv3_stair_correction
-    CMP.B #(cv3_stair_ATTACH_TOLERANCE + 1)
+    CMP.B #(cv3_stair_ATTACH_TOLERANCE+1)
     BCC cv3_stair_find_bound
     JMP.W cv3_stair_find_next
 
@@ -675,12 +674,12 @@ cv3_stair_normalize_upper_endpoint:
     CMP.B #$FF
     BNE cv3_stair_normalize_room
     LDA.B cv3_stair_correction
-    CMP.B #($100 - cv3_stair_ATTACH_TOLERANCE)
+    CMP.B #($100-cv3_stair_ATTACH_TOLERANCE)
     BCC cv3_stair_normalize_room
     RTS
 cv3_stair_normalize_raw_positive:
     LDA.B cv3_stair_correction
-    CMP.B #(cv3_stair_ATTACH_TOLERANCE + 1)
+    CMP.B #(cv3_stair_ATTACH_TOLERANCE+1)
     BCS cv3_stair_normalize_room
     RTS
 cv3_stair_normalize_room:
