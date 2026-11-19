@@ -161,6 +161,10 @@ if !cv3PlayerControls == 1
     incsrc "code/custom/player_controls_fixed.asm"
 endif
 
+if !cv3BetterStairs == 1 && !expandCHR == 1
+    incsrc "code/custom/trevor_stair_sprites.asm"
+endif
+
 assert pc() <= $ECDC    
 pad LAST_BANK+$CDC    ; mark free space gained 
 
